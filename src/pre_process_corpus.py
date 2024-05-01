@@ -1,8 +1,22 @@
 import pandas as pd
+import rdata
+import os
 
 ###############################################################
 # Preparing CSV files from original texts
+def convert_rdm_to_csv(original_filepath):
+
+    converted = rdata.read_rda(original_filepath)
+    converted_key = list(converted.keys())[0]
+    df = pd.DataFrame(converted[converted_key])
+    dir = os.path.dirname(original_filepath)
+    fixation_filepath = f'{dir}/fixation_report.csv'
+    df.to_csv(fixation_filepath)
+
+    return fixation_filepath
+
 def create_original_texts_dataframe(file_path):
+
     # texts_df = pd.read_csv("/Users/anm/code/RegressionMECO/data/MECO/supp texts.csv", sep=',')
     texts_df = pd.read_csv(file_path, sep=',')
     texts_df.drop(['Unnamed: 13', 'Unnamed: 14'], axis=1, inplace=True)
@@ -237,12 +251,13 @@ def pre_process_corpus(texts_filepath, fixation_filepath):
     # meco_df = clean_words_meco(meco_df)
     # meco_df = meco_df.sort_values(by=['subid','trialid','ianum']) # re-order words by ianum
     # meco_df.to_csv('../data/MECO/meco_df_sorted.csv')
-    #
-    # # TODO discuss if order is of fixation! Consequences for surprisal using the text order, and not how each participant reads the text
+
     # meco_corrected_ianum = assign_ianum_to_meco(words_df, meco_df)
     # check_alignment(meco_corrected_ianum, words_df) # check alignment
     # meco_corrected_ianum = pd.read_csv('../data/MECO/meco_corrected_ianum.csv')
 
+    if fixation_filepath.endswith('.rda'):
+        fixation_filepath = convert_rdm_to_csv(fixation_filepath)
     fixation_df = pd.read_csv(fixation_filepath)
     fixation_df = fixation_df[['uniform_id',
                                'trialid',

@@ -62,7 +62,7 @@ def compute_sensitivity(model, embedding_matrix, tokenizer, words, word_ids):
                 word = ' ' + word
             token_id = tokenizer.encode(word, add_special_tokens=False)
             # print(word, token_id, tokenizer.convert_ids_to_tokens(token_id))
-            if len(token_id) > 1:
+            if len(token_id) > 1 and token_id not in multi_tokens:
                 multi_tokens.append(token_id)
         # print(multi_tokens)
         # find which locations in array represent multi-tokens
@@ -72,19 +72,38 @@ def compute_sensitivity(model, embedding_matrix, tokenizer, words, word_ids):
             # print(indices)
             for occurrence in indices:
                 sensitivity_merge.append(occurrence)
-                all_indices.extend(occurrence)
+                # all_indices.extend([index for index in range(occurrence[0], occurrence[-1] + 1)])
+        # print(sensitivity_merge)
+        # check multi-tokens within other multi-tokens. Keep indices of longest multi-token.
+        exclude = []
+        for occurrence in sensitivity_merge:
+            id_seq = list(range(occurrence[0], occurrence[-1]+1))
+            # print(f'id_seq 1: {id_seq}')
+            for occurrence2 in sensitivity_merge:
+                id_seq2 = list(range(occurrence2[0], occurrence2[-1]+1))
+                # print(f'id_seq 2: {id_seq2}')
+                if len(id_seq) < len(id_seq2):
+                    if any(id_seq == id_seq2[i:i + len(id_seq)] for i in range(len(id_seq2)-len(id_seq) + 1)):
+                       exclude.append(id_seq)
+        sensitivity_merge_updated = [i for i in sensitivity_merge if list(range(i[0],i[-1]+1)) not in exclude]
+        all_indices = [index for occurrence in sensitivity_merge_updated for index in range(occurrence[0], occurrence[-1] + 1)]
+        # print(all_indices)
         # create new array with locations of each multi-token merged into one
         sensitivity_updated = []
         for i in range(len(sensitivity)):
             if i in all_indices:
-                for occurrence in sensitivity_merge:
+                for occurrence in sensitivity_merge_updated:
                     if i == occurrence[0]:
                         sensitivity_updated.append(np.mean(sensitivity[occurrence[0]:occurrence[-1]+1]))
             else:
                 sensitivity_updated.append(sensitivity[i])
         # print(sensitivity_updated)
+        # print(len(sensitivity_updated))
         # print({'word': words[word_index], 'word_id': word_ids[word_index], 'sensitivity': sensitivity_updated})
         # print()
+        # if len(sensitivity_data) > 1 and len(sensitivity_updated) > len(sensitivity_data[-1]['sensitivity']) + 1:
+        #     print('CHECK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        #     exit()
         sensitivity_data.append({'word': words[word_index], 'word_id': word_ids[word_index], 'sensitivity': sensitivity_updated})
 
     return sensitivity_data
@@ -100,33 +119,40 @@ def extract_relative_saliency(model, embeddings, tokenizer, words, word_ids):
 
     # For each token, I sum the sensitivity values it has with all other tokens
     distributed_sensitivity_updated = []
-    for dist_s in distributed_sensitivity:
+    for item, dist_s in enumerate(distributed_sensitivity):
         dist = [s for s in dist_s]
-        for i in range(len(dist_s), len(words)):
+        for i in range(len(dist), len(words)):
             dist.append(0) # make all arrays same length (length of sequence)
         distributed_sensitivity_updated.append(dist)
-    saliency = np.sum(distributed_sensitivity_updated, axis=0)
+    saliency_sum = np.sum(distributed_sensitivity_updated, axis=0)
+    saliency_mean = np.mean(distributed_sensitivity_updated, axis=0)
 
     # Taking the softmax does not make a difference for calculating correlation
     # It can be useful to scale the salience signal to the same range as the human attention
     # saliency = scipy.special.softmax(saliency)
 
-    return tokens, token_ids, saliency[:len(tokens)], distributed_sensitivity
+    return tokens, token_ids, saliency_sum[:len(tokens)], saliency_mean[:len(tokens)], distributed_sensitivity
 
 def extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, outfile):
 
-    all_text_ids, all_token_ids, all_tokens, all_saliency, all_dist_saliency = [], [], [], [], []
+    all_text_ids, all_token_ids, all_tokens, all_saliency_sum, all_saliency_mean, all_dist_saliency = [], [], [], [], [], []
 
     for i, text in enumerate(texts):
 
-        tokens, token_ids, saliency, dist_saliency = extract_relative_saliency(model, embeddings, tokenizer, words[i], word_ids[i])
+        tokens, token_ids, saliency_sum, saliency_mean, dist_saliency = extract_relative_saliency(model, embeddings, tokenizer, words[i], word_ids[i])
         all_text_ids.extend([i for token in tokens])
         all_tokens.extend(tokens)
         all_token_ids.extend(token_ids)
-        all_saliency.extend(saliency)
+        all_saliency_sum.extend(saliency_sum)
+        all_saliency_mean.extend(saliency_mean)
         all_dist_saliency.extend(dist_saliency)
 
-    df = pd.DataFrame({'text_id': all_text_ids, 'token_id': all_token_ids, 'token': all_tokens, 'distributed_saliency': all_dist_saliency, 'saliency': all_saliency})
+    df = pd.DataFrame({'text_id': all_text_ids,
+                       'token_id': all_token_ids,
+                       'token': all_tokens,
+                       'distributed_saliency': all_dist_saliency,
+                       'saliency_sum': all_saliency_sum,
+                       'saliency_mean': all_saliency_mean})
     df.to_csv(outfile)
 
 def main():
@@ -137,7 +163,8 @@ def main():
 
     for corpus in corpora:
 
-        corpus_df = pd.read_csv(f'../data/{corpus}/words_df.csv', index_col=0)
+        # corpus_df = pd.read_csv(f'../data/MECO/words_df.csv')
+        corpus_df = pd.read_csv(f'words_df.csv', index_col=0)
         texts = corpus_df.texts.unique()
         words, word_ids = [], []
         for text, group in corpus_df.groupby('trialid'):
@@ -152,7 +179,7 @@ def main():
                 embeddings = model.get_input_embeddings()
 
                 for measure in measures:
-                    outfile_path = f'../data/{corpus}/{modelname}_{measure}.csv'
+                    outfile_path = f'{modelname}_{measure}.csv'
                     print(f'Extract saliency for {corpus} with {modelname}')
                     extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, outfile_path)
 

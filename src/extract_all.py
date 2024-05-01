@@ -4,6 +4,7 @@ import pandas as pd
 
 texts_filepath = "../data/MECO/supp texts.csv"
 # corpus_filepath = '../data/MECO/trials_eng_df.csv'
+# fixation_filepath = '../data/MECO/joint_data_trimmed.rda'
 fixation_filepath = '../data/MECO/fixation_en_df.csv'
 
 # fixation_df, words_df = pre_process_corpus(texts_filepath, fixation_filepath)
