@@ -192,6 +192,29 @@ def check_alignment(meco_corrected_ianum, words_df):
 #
 #     return distances
 
+def pre_process_fixation_data(fixation_filepath):
+
+    if fixation_filepath.endswith('.rda'):
+        fixation_filepath = convert_rdm_to_csv(fixation_filepath)
+
+    fixation_df = pd.read_csv(fixation_filepath)
+    fixation_df = fixation_df[(fixation_df['lang'] == 'en')]
+    fixation_df = fixation_df[['uniform_id',
+                               'trialid',
+                               'fixid',
+                               'dur',
+                               'ia',
+                               'ianum',
+                               'ia.reg.out',
+                               'ia.reg.out.to',
+                               'ia.reg.in']]
+
+    fixation_df = fixation_df.rename(columns={'ia.reg.out': 'reg.out',
+                                              'ia.reg.out.to': 'reg.out.to',
+                                              'ia.reg.in': 'reg.in'})
+
+    return fixation_df
+
 def compute_distance(word_ids, regression_out, regression_out_to):
 
     distances = []
@@ -217,6 +240,19 @@ def compute_all_distances(fixation_data):
         distances.extend(distance)
 
     return distances
+
+def add_variables(variables, fixation_df):
+
+    if 'distance' in variables:
+        # find distance of regressions
+        distances = compute_all_distances(fixation_df)
+        fixation_df['reg.dist'] = distances
+    if 'length' in variables:
+        # add length and frequency
+        fixation_df['length'] = [len(word) for word in fixation_df['ia'].tolist()]
+    # TODO add other variables
+
+    return fixation_df
 
 # ######################################################
 # When merging the two datasets so far, it's possible to check that there are some problems:
@@ -254,33 +290,13 @@ def pre_process_corpus(texts_filepath, fixation_filepath):
 
     # meco_corrected_ianum = assign_ianum_to_meco(words_df, meco_df)
     # check_alignment(meco_corrected_ianum, words_df) # check alignment
+    # meco_corrected_ianum.to_csv('../data/MECO/meco_corrected_ianum.csv')
     # meco_corrected_ianum = pd.read_csv('../data/MECO/meco_corrected_ianum.csv')
 
-    if fixation_filepath.endswith('.rda'):
-        fixation_filepath = convert_rdm_to_csv(fixation_filepath)
-    fixation_df = pd.read_csv(fixation_filepath)
-    fixation_df = fixation_df[['uniform_id',
-                               'trialid',
-                               'fixid',
-                               'dur',
-                               'ia',
-                               'ianum',
-                               'ia.reg.out',
-                               'ia.reg.out.to']]
-
-    fixation_df = fixation_df.rename(columns={'ia.reg.out': 'reg.out', 'ia.reg.out.to': 'reg.out.to'})
-    # find distance of regressions
-    distances = compute_all_distances(fixation_df)
-    fixation_df['reg.dist'] = distances
-    # meco_corrected_ianum.to_csv('../data/MECO/meco_corrected_ianum.csv')
-
-    # add length and frequency
-    fixation_df['length'] = [len(word) for word in fixation_df['ia'].tolist()]
-
-    # add reg word + 1 and word + 2
-
-    fixation_df.to_csv('../data/MECO/fixation_en_df.csv')
-    words_df.to_csv('../data/MECO/words_df.csv')
+    fixation_df = pre_process_fixation_data(fixation_filepath)
+    fixation_df = add_variables(['distance', 'length', 'frequency', 'word+1', 'word+2'], fixation_df)
+    fixation_df.to_csv(f'../data/MECO/fixation_en_df.csv')
+    words_df.to_csv(f'../data/MECO/words_df_en.csv')
 
     # return meco_corrected_ianum, words_df
     return fixation_df, words_df

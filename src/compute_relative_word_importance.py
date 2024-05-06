@@ -154,6 +154,55 @@ def extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, o
                        'saliency_sum': all_saliency_sum,
                        'saliency_mean': all_saliency_mean})
     df.to_csv(outfile)
+    return df
+
+def create_saliency_dataframe(fixation_df, importance_df):
+
+    importance_df.rename(columns={'text_id': 'trialid', 'token_id': 'ianum', 'token': 'ia'}, inplace=True)
+
+    fixation_df = fixation_df[(fixation_df['reg.out']) == 1.0]
+
+    fixation_importance = {'uniform_id': [],
+                           'trialid': [],
+                           'ianum': [],
+                           'ia': [],
+                           'previous.ia': [],
+                           'previous.ianum': [],
+                           'reg.in': [],
+                           'saliency': []}
+
+    for id, group in fixation_df.groupby(['uniform_id', 'trialid']):
+
+        importance_df_trialid = importance_df[(importance_df['trialid'] == id[1]-1)]
+
+        for fixated_word, fixated_word_id, reg_out_to in zip(group['ia'].tolist(), group['ianum'].tolist(), group['reg.out.to'].tolist()):
+
+            fixated_word_df = importance_df_trialid[(importance_df_trialid['ianum'] == fixated_word_id)]
+            saliency_array = fixated_word_df['distributed_saliency'].tolist()[0]
+
+            if type(saliency_array) == str:
+                saliency_array = saliency_array.replace('[','').replace(']','')
+                saliency_array = saliency_array.split(',')
+                saliency_array = [float(s) for s in saliency_array[:-1]]
+
+            fixation_importance['saliency'].extend(saliency_array)
+            fixation_importance['previous.ianum'].extend(importance_df_trialid['ianum'].tolist()[:len(saliency_array)])
+            fixation_importance['previous.ia'].extend(importance_df_trialid['ia'].tolist()[:len(saliency_array)])
+            fixation_importance['ianum'].extend([fixated_word_id for i in range(len(saliency_array))])
+            fixation_importance['ia'].extend([fixated_word for i in range(len(saliency_array))])
+            fixation_importance['trialid'].extend([id[1] for i in range(len(saliency_array))])
+            fixation_importance['uniform_id'].extend([id[0] for i in range(len(saliency_array))])
+
+            reg_in = []
+            for previous_id in importance_df_trialid['ianum'].tolist()[:len(saliency_array)]:
+                if previous_id == reg_out_to:
+                    reg_in.append(1)
+                else:
+                    reg_in.append(0)
+            fixation_importance['reg.in'].extend(reg_in)
+
+    fixation_importance_df = pd.DataFrame.from_dict(fixation_importance)
+    fixation_importance_df.to_csv('regression_importance.csv')
 
 def main():
 
@@ -164,7 +213,9 @@ def main():
     for corpus in corpora:
 
         # corpus_df = pd.read_csv(f'../data/MECO/words_df.csv')
-        corpus_df = pd.read_csv(f'words_df.csv', index_col=0)
+        corpus_df = pd.read_csv(f'../data/MECO/words_df.csv', index_col=0)
+        fixation_df = pd.read_csv('../data/MECO/fixation_en_df.csv')
+
         texts = corpus_df.texts.unique()
         words, word_ids = [], []
         for text, group in corpus_df.groupby('trialid'):
@@ -181,7 +232,8 @@ def main():
                 for measure in measures:
                     outfile_path = f'{modelname}_{measure}.csv'
                     print(f'Extract saliency for {corpus} with {modelname}')
-                    extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, outfile_path)
+                    saliency_df = extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, outfile_path)
+                    create_saliency_dataframe(fixation_df, saliency_df)
 
 if __name__ == '__main__':
     main()
