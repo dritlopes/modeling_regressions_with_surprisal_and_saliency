@@ -202,7 +202,9 @@ def create_saliency_dataframe(fixation_df, importance_df):
             fixation_importance['reg.in'].extend(reg_in)
 
     fixation_importance_df = pd.DataFrame.from_dict(fixation_importance)
-    fixation_importance_df.to_csv('regression_importance.csv')
+    fixation_importance_df.to_csv('../data/MECO/regression_importance.csv')
+    fixation_importance_df_ranked = fixation_importance_df.sort_values(by=['uniform_id','trialid','ianum','saliency'])
+    fixation_importance_df_ranked.to_csv('../data/MECO/regression_importance_ranked.csv')
 
 def main():
 
@@ -212,8 +214,8 @@ def main():
 
     for corpus in corpora:
 
-        # corpus_df = pd.read_csv(f'../data/MECO/words_df.csv')
-        corpus_df = pd.read_csv(f'../data/MECO/words_df.csv', index_col=0)
+        # corpus_df = pd.read_csv(f'../data/MECO/words_en_df.csv')
+        corpus_df = pd.read_csv(f'../data/MECO/words_en_df.csv', index_col=0)
         fixation_df = pd.read_csv('../data/MECO/fixation_en_df.csv')
 
         texts = corpus_df.texts.unique()

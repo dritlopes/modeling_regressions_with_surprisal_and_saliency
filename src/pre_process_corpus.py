@@ -1,6 +1,8 @@
 import pandas as pd
 import rdata
 import os
+import numpy as np
+import matplotlib.pyplot as plt
 
 ###############################################################
 # Preparing CSV files from original texts
@@ -9,23 +11,24 @@ def convert_rdm_to_csv(original_filepath):
     converted = rdata.read_rda(original_filepath)
     converted_key = list(converted.keys())[0]
     df = pd.DataFrame(converted[converted_key])
-    dir = os.path.dirname(original_filepath)
-    fixation_filepath = f'{dir}/fixation_report.csv'
-    df.to_csv(fixation_filepath)
+    filepath = original_filepath.replace('rda', 'csv')
+    df.to_csv(filepath)
 
-    return fixation_filepath
+    return filepath
 
-def create_original_texts_dataframe(file_path):
+def create_original_texts_dataframe(file_path, language):
 
     # texts_df = pd.read_csv("/Users/anm/code/RegressionMECO/data/MECO/supp texts.csv", sep=',')
     texts_df = pd.read_csv(file_path, sep=',')
     texts_df.drop(['Unnamed: 13', 'Unnamed: 14'], axis=1, inplace=True)
     texts_df.columns = ['lang', 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
 
-    eng_filter = (texts_df['lang'] == 'English') #filter for only the texts in English
-    eng_texts_df = texts_df.loc[eng_filter]
+    if language == 'en': filter = 'English'
+    elif language == 'du': filter = 'Dutch'
+    lan_filter = (texts_df['lang'] == filter)
+    lan_texts_df = texts_df.loc[lan_filter]
 
-    trialid_raw_df = eng_texts_df.stack().astype(str).reset_index(level=1)
+    trialid_raw_df = lan_texts_df.stack().astype(str).reset_index(level=1)
     trialid_raw_df.rename(columns={'level_1':'trialid', 0:'text'}, inplace=True)
 
     trialid_raw_df = trialid_raw_df.reset_index(drop=False)
@@ -94,7 +97,7 @@ def create_ianum_from_original_texts(texts_df: pd):
                             'ianum': ianum_new,
                             'ia': ia_new})
 
-    # words_df.to_csv('/Users/anm/code/RegressionMECO/data/MECO/words_df.csv', sep='\t')
+    # words_df.to_csv('/Users/anm/code/RegressionMECO/data/MECO/words_en_df.csv', sep='\t')
     return words_df
 
 #function that creates a new ID for each word, based on the new ID created in the words_df and combined with the old ID in MECO dataset
@@ -138,30 +141,28 @@ def assign_ianum_to_meco(words_df: pd.DataFrame, meco_df: pd.DataFrame):
 ###############################################################
 #Correcting the ID of each word in MECO English dataset (trials_eng_df)
 
-def clean_words_meco(meco_df: pd.DataFrame):
+def clean_words_meco(meco_df: pd.DataFrame, language):
     # data_frame = pd.read_csv("/Users/anm/code/RegressionMECO/data/MECO/word_data.csv", sep='\t')
 
     # MECO English dataset
 
-    # trials_eng_df = pd.read_csv("/Users/anm/code/RegressionMECO/data/MECO/trials_eng_df.csv", sep='\t', index_col=0) #with index_col=0 there will not be a unnamed column)
-    trials_eng_df = meco_df.copy()
+    # trials_eng_df = pd.read_csv("/Users/anm/code/RegressionMECO/data/MECO/trials_en_df.csv", sep='\t', index_col=0) #with index_col=0 there will not be a unnamed column)
+    trials_df = meco_df.copy()
 
-    # 1-3
+    # filter trials for language
+    lan_filter = (trials_df['lang'] == language)
+    trials_df = trials_df.loc[lan_filter]
+
     # remove quotation marks
-    trials_eng_df["ia"] = trials_eng_df["ia"].str.replace('"','')
+    trials_df["ia"] = trials_df["ia"].str.replace('"','')
 
-    # 2-3
-    # remove the word "officialidentification" in trialid 12.0 ianum 16.0
-    trials_eng_df = trials_eng_df[trials_eng_df["ia"].str.contains("officialidentification")==False]
+    if language == 'en':
+        # remove the word "officialidentification" in trialid 12.0 ianum 16.0
+        trials_df = trials_df[trials_df["ia"].str.contains("officialidentification")==False]
+        # remove ia "trucks,cars" in trialid 12.0 ianum 29.0
+        trials_df = trials_df[trials_df["ia"].str.contains("trucks,and")==False]
 
-    # 3-3
-    # remove ia "trucks,cars" in trialid 12.0 ianum 29.0
-    trials_eng_df = trials_eng_df[trials_eng_df["ia"].str.contains("trucks,and")==False]
-
-    # dataset with new IANUM, as reference:
-    # words_df = pd.read_csv("/Users/anm/code/RegressionMECO/data/MECO/words_df.csv", sep='\t', index_col=0) #with index_col=0 there will not be a unnamed column)
-
-    return trials_eng_df
+    return trials_df
 
 def check_alignment(meco_corrected_ianum, words_df):
 
@@ -176,44 +177,6 @@ def check_alignment(meco_corrected_ianum, words_df):
                 print(meco_row[['subid', 'trialid', 'ia', 'ianum']])
                 print(words_filtered['ia'].tolist()[0], words_filtered['ianum'].tolist()[0])
                 print()
-
-# def compute_distance(word_ids, regression_out, regression_in):
-#
-#     distances = []
-#     counter = 0
-#     for word, r_out in zip(word_ids, regression_out):
-#         if r_out == 1:
-#             regression_in_till_i = [i for r, i in zip(regression_in[:counter], word_ids[:counter]) if r == 1]
-#             closest_regression_in = max(regression_in_till_i)
-#             distances.append(word - closest_regression_in)
-#         else:
-#             distances.append(None)
-#         counter += 1
-#
-#     return distances
-
-def pre_process_fixation_data(fixation_filepath):
-
-    if fixation_filepath.endswith('.rda'):
-        fixation_filepath = convert_rdm_to_csv(fixation_filepath)
-
-    fixation_df = pd.read_csv(fixation_filepath)
-    fixation_df = fixation_df[(fixation_df['lang'] == 'en')]
-    fixation_df = fixation_df[['uniform_id',
-                               'trialid',
-                               'fixid',
-                               'dur',
-                               'ia',
-                               'ianum',
-                               'ia.reg.out',
-                               'ia.reg.out.to',
-                               'ia.reg.in']]
-
-    fixation_df = fixation_df.rename(columns={'ia.reg.out': 'reg.out',
-                                              'ia.reg.out.to': 'reg.out.to',
-                                              'ia.reg.in': 'reg.in'})
-
-    return fixation_df
 
 def compute_distance(word_ids, regression_out, regression_out_to):
 
@@ -241,63 +204,230 @@ def compute_all_distances(fixation_data):
 
     return distances
 
-def add_variables(variables, fixation_df):
+def add_variables(variables, df, resources, language):
 
     if 'distance' in variables:
         # find distance of regressions
-        distances = compute_all_distances(fixation_df)
-        fixation_df['reg.dist'] = distances
+        distances = compute_all_distances(df)
+        df['reg.dist'] = distances
+        df["reg.dist"] = df["reg.dist"].fillna(0)
+        df['reg.dist.log'] = np.log(np.array(df["reg.dist"].tolist()))
+
     if 'length' in variables:
         # add length and frequency
-        fixation_df['length'] = [len(word) for word in fixation_df['ia'].tolist()]
-    # TODO add other variables
+        df['length'] = [len(word) for word in df['ia'].tolist()]
+        df["length.log"] = np.log(df["length"])
+
+    if 'frequency' in variables and 'frequency' in resources.keys():
+        frequency_df = pd.read_csv(resources['frequency'])
+        if language == 'en': language = 'english'
+        elif language == 'du': language = 'dutch'
+        frequency_df = frequency_df[frequency_df['lang'] == language]
+        frequency_col = []
+        for word in df['ia'].tolist():
+            word = ''.join(filter(lambda x: x.isalpha() or x.isdigit() or x.isspace(), word))
+            if word.isalpha():
+                word = word.lower()
+            if word in frequency_df['ia_clean'].tolist():
+                frequency_col.append(frequency_df['zipf_freq'].tolist()[frequency_df['ia_clean'].tolist().index(word)])
+            else:
+                frequency_col.append(None)
+        df['frequency'] = frequency_col
+
+    if 'word+1' in variables:
+        reg_out_plus_one = []
+        for id, group in df.groupby(['uniform_id','trialid']):
+            reg = [group['reg.out'].tolist()[i+1] if i + 1 < len(group['reg.out'].tolist()) else None for
+                   i, reg_out in enumerate(group['reg.out'].tolist())]
+            reg_out_plus_one.extend(reg)
+        df['reg.out.plus.one'] = reg_out_plus_one
+
+        if 'distance' in variables:
+            reg_out_plus_one_dist = []
+            for id, group in df.groupby(['uniform_id', 'trialid']):
+                reg = [group['reg.dist.log'].tolist()[i + 1] if i + 1 < len(group['reg.dist.log'].tolist()) else None for
+                       i, reg_out in enumerate(group['reg.dist.log'].tolist())]
+                reg_out_plus_one_dist.extend(reg)
+            df['dist.log.plus.one'] = reg_out_plus_one_dist
+
+    if 'word+2' in variables:
+        reg_out_plus_two = []
+        for id, group in df.groupby(['uniform_id', 'trialid']):
+            reg = [group['reg.out'].tolist()[i + 2] if i + 2 < len(group['reg.out'].tolist()) else None for
+                   i, reg_out in enumerate(group['reg.out'].tolist())]
+            reg_out_plus_two.extend(reg)
+        df['reg.out.plus.two'] = reg_out_plus_two
+
+        if 'distance' in variables:
+            reg_out_plus_two_dist = []
+            for id, group in df.groupby(['uniform_id', 'trialid']):
+                reg = [group['reg.dist.log'].tolist()[i + 2] if i + 2 < len(group['reg.dist.log'].tolist()) else None for
+                       i, reg_out in enumerate(group['reg.dist.log'].tolist())]
+                reg_out_plus_two_dist.extend(reg)
+            df['dist.log.plus.two'] = reg_out_plus_two_dist
+
+    return df
+
+def pre_process_corpus_data(corpus_filepath, language, words_df):
+
+    if corpus_filepath.endswith('.rda'):
+        corpus_filepath = convert_rdm_to_csv(corpus_filepath)
+    corpus_df = pd.read_csv(corpus_filepath, index_col=0)
+    corpus_df = clean_words_meco(corpus_df, language)
+    corpus_df = corpus_df.sort_values(by=['subid', 'trialid', 'ianum'])  # re-order words by ianum
+    corpus_df.to_csv(f'../data/MECO/meco_{language}_df_sorted.csv')
+    corpus_df = assign_ianum_to_meco(words_df, corpus_df)
+    check_alignment(corpus_df, words_df)  # check alignment
+
+    return corpus_df
+
+def find_x_changes(fixation_df):
+
+    x_changes = []
+    count_line_above = 0
+    count_forward = 0
+    for id, group in fixation_df.groupby(['uniform_id','trialid']):
+        # select regressions
+        reg_out_rows = group[group['reg.out'] == 1]
+        for i, reg_out_to in enumerate(reg_out_rows['reg.out.to'].tolist()):
+            # find row with destination of regression
+            reg_in_row = group[(group['ianum'] == reg_out_to)
+                               & (group['reg.in'] == 1)
+                               & (group['fixid'] > reg_out_rows['fixid'].tolist()[i])]
+            if not reg_in_row.empty:
+                index = 0
+                if len(reg_in_row['line.change'].tolist()) > 1:
+                    index = reg_in_row['fixid'].tolist().index(min(reg_in_row['fixid'].tolist()))
+                # was the regression to the line before?
+                if reg_in_row['line.change'].tolist()[index] == -1:
+                    count_line_above += 1
+                    # forward x?
+                    # find out 90th percentile of x changes for forward saccades
+                    reg_out_x = reg_out_rows['xs'].tolist()[i]
+                    reg_in_x = reg_in_row['xs'].tolist()[index]
+                    diff = reg_in_x - reg_out_x
+                    if diff > 0:
+                        count_forward += 1
+                        x_changes.append(diff)
+
+    return x_changes
+
+def pre_process_fixation_data(fixation_filepath, language):
+
+    if fixation_filepath.endswith('.rda'):
+        fixation_filepath = convert_rdm_to_csv(fixation_filepath)
+
+    fixation_df = pd.read_csv(fixation_filepath)
+    fixation_df = fixation_df[(fixation_df['lang'] == language)]
+    fixation_df = fixation_df.loc[:, ~fixation_df.columns.str.contains('^Unnamed')]
+    fixation_df = fixation_df[['uniform_id',
+                               'trialid',
+                               'fixid',
+                               'ia',
+                               'ianum',
+                               'ia.firstskip',
+                               'dur',
+                               'xs',
+                               'ys',
+                               'ym',
+                               'line',
+                               'line.change',
+                               'sac.in',
+                               'sac.out',
+                               'ia.reg.out',
+                               'ia.reg.out.to',
+                               'ia.reg.in']]
+
+    fixation_df = fixation_df.rename(columns={'ia.reg.out': 'reg.out',
+                                              'ia.reg.out.to': 'reg.out.to',
+                                              'ia.reg.in': 'reg.in',
+                                              'ia.firstskip': 'skip'})
+
+
+    # Remove first fixation of a trial that is also triggers a regression (likely noise)
+    fixation_df = fixation_df.drop(fixation_df[(fixation_df['fixid'] == 1) & (fixation_df['reg.out'] == 1)].index)
+
+    # Remove regression that is subsequently followed by another regression (likely noise)
+    indices_to_drop = []
+    for id, group in fixation_df.groupby(['uniform_id','trialid']):
+        reg_in = group['reg.in'].tolist()
+        for i, reg in enumerate(reg_in):
+            if i + 1 < len(reg_in):
+                if reg_in[i] == 1 and reg_in[i+1] == 1:
+                    indices_to_drop.append(group.iloc[i].name)
+    fixation_df.drop(indices_to_drop, inplace=True)
+
+    # Deal with noise in regressions to upper lines
+    # we assume regression was unintended when it was to the previous line (<y) and forward (>x),
+    # and the number of pixels that the saccade goes forward (ie., change in x) is below the 90th
+    # percentile for x changes for forward saccades
+    # check distance of reg not in the same line and remove if to line above and close to origin
+    indices_to_drop = []
+    x_changes = find_x_changes(fixation_df)
+    threshold_x_change = np.percentile(x_changes, 90)
+    for id, group in fixation_df.groupby(['uniform_id','trialid']):
+        # select regressions
+        reg_out_rows = group[group['reg.out'] == 1]
+        for i, reg_out_to in enumerate(reg_out_rows['reg.out.to'].tolist()):
+            # find row with destination of regression
+            reg_in_row = group[(group['ianum'] == reg_out_to)
+                               & (group['reg.in'] == 1)
+                               & (group['fixid'] > reg_out_rows['fixid'].tolist()[i])]
+            if not reg_in_row.empty:
+                index = 0
+                if len(reg_in_row['line.change'].tolist()) > 1:
+                    index = reg_in_row['fixid'].tolist().index(min(reg_in_row['fixid'].tolist()))
+                # was the regression to the line before?
+                if reg_in_row['line.change'].tolist()[index] == -1:
+                    # forward x?
+                    reg_out_x = reg_out_rows['xs'].tolist()[i]
+                    reg_in_x = reg_in_row['xs'].tolist()[index]
+                    diff = reg_in_x - reg_out_x
+                    if diff > 0:
+                        # close x (< 90th percentile of x changes for forward saccades)?
+                        if diff < threshold_x_change:
+                            # remove regression
+                            indices_to_drop.append(reg_out_rows.iloc[i].name)
+    # distribution of regressions in terms of line distance
+    # reg_out_rows = fixation_df[fixation_df['reg.in'] == 1]
+    # reg_out_rows['line.change'].value_counts().to_csv('dist_reg_line.csv')
+    fixation_df.drop(indices_to_drop, inplace=True)
 
     return fixation_df
 
-# ######################################################
-# When merging the two datasets so far, it's possible to check that there are some problems:
-#
-# ######################################################
-# #FIRST PROBLEM: THERE ARE STILL 82 ROWS WITH EMPTY SURPRISAL VALUES
-#
-# #checking whether there are empty values for surprisal, besides all the first words
-# merge_df[(merge_df['surprisal'].isnull()) & (merge_df['ianum_merge'] > 1)][['trialid', 'ianum', 'ia', 'uniform_id', 'IA_NEW']]
-#
-# ######################################################
-# #SECOND PROBLEM: THERE ARE STILL 3454 ROWS WITH DIFFERENT WORDS AND SAME ID
-#
-# #checking whether there are different words with the same ianum (major problem of the dataset)
-# merge_df[(merge_df['ia'] != merge_df['IA_NEW'])][['trialid', 'ianum', 'ia', 'uniform_id', 'IA_NEW', "ianum_merge"]]
-# #and there are 3454 rows for the trialid 1.0, 2.0, 3.0 and (not 12.0 anymore BECAUSE I CORRECTED IT ABOVE)
-#
-# #FOR WHICH TEXTS?
-# merge_df[(merge_df['ia'] != merge_df['IA_NEW'])]['trialid'].unique()
-# ######################################################
-
-
 ###############################################################
-# Run all the functions in the script
-def pre_process_corpus(texts_filepath, fixation_filepath):
 
-    original_df = create_original_texts_dataframe(texts_filepath) # with index_col=0 it will not have an unnamed column)
-    original_df = clean_original_texts(original_df)
-    words_df = create_ianum_from_original_texts(original_df)
+def pre_process_corpus(texts_filepath, fixation_filepath=None, corpus_filepath=None, language='en'):
 
-    # meco_df = pd.read_csv(corpus_filepath, sep='\t', index_col=0) # with index_col=0 it will not have an unnamed column)
-    # meco_df = clean_words_meco(meco_df)
-    # meco_df = meco_df.sort_values(by=['subid','trialid','ianum']) # re-order words by ianum
-    # meco_df.to_csv('../data/MECO/meco_df_sorted.csv')
+    words_df, fixation_df, corpus_df = None, None, None
 
-    # meco_corrected_ianum = assign_ianum_to_meco(words_df, meco_df)
-    # check_alignment(meco_corrected_ianum, words_df) # check alignment
-    # meco_corrected_ianum.to_csv('../data/MECO/meco_corrected_ianum.csv')
-    # meco_corrected_ianum = pd.read_csv('../data/MECO/meco_corrected_ianum.csv')
+    # original_df = create_original_texts_dataframe(texts_filepath, language) # with index_col=0 it will not have an unnamed column)
+    # original_df = clean_original_texts(original_df)
+    # words_df = create_ianum_from_original_texts(original_df)
+    # words_df.to_csv(f'../data/MECO/words_{language}_df.csv')
+    resources = {'frequency': '../data/MECO/wordlist_meco.csv'}
+    # words_df = pd.read_csv(f'../data/MECO/words_{language}_df.csv')
 
-    fixation_df = pre_process_fixation_data(fixation_filepath)
-    fixation_df = add_variables(['distance', 'length', 'frequency', 'word+1', 'word+2'], fixation_df)
-    fixation_df.to_csv(f'../data/MECO/fixation_en_df.csv')
-    words_df.to_csv(f'../data/MECO/words_df_en.csv')
+    # if corpus_filepath:
+    #     # corpus_df = pre_process_corpus_data(corpus_filepath, language, words_df)
+    #     corpus_df = pd.read_csv(corpus_filepath)
+    #     # corpus_df = corpus_df.loc[:, ~corpus_df.columns.str.contains('^Unnamed')]
+    #     corpus_df = add_variables(['length', 'frequency'], corpus_df, resources, language)
+    #     corpus_df.to_csv(f'../data/MECO/corpus_{language}_df.csv', index=False)
+
+    if fixation_filepath:
+        # fixation_df = pd.read_csv(f'../data/MECO/fixation_{language}_df.csv')
+        fixation_df = pre_process_fixation_data(fixation_filepath, language)
+        fixation_df = add_variables(['distance', 'length', 'frequency', 'word+1', 'word+2'], fixation_df, resources, language)
+        fixation_df.to_csv(f'../data/MECO/fixation_{language}_df.csv', index=False)
+
+        # num_bins = 10
+        # min_val = fixation_df['reg.dist'].min()
+        # max_val = fixation_df['reg.dist'].max()
+        # bin_size = (max_val - min_val) // num_bins
+        # bins = np.arange(min_val, max_val, bin_size)
+        # fixation_df['reg.dist'].astype(int).value_counts(bins=bins).to_csv('counts3.csv')
 
     # return meco_corrected_ianum, words_df
-    return fixation_df, words_df
+    return fixation_df, words_df, corpus_df
 

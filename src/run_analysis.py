@@ -1,21 +1,37 @@
 import pandas as pd
-# Calculate regression out rates and correlation
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
-# merged_df = pd.read_csv("/Users/anm/code/RegressionMECO/data/MECO/merged_df.csv", sep='\t', index_col=0)
-def calculate_mean_ia_regression(meco_df: pd.DataFrame):
+# # merge saliency and word-based data
+# saliency_filepath = f'GroNLP_gpt2-small-dutch_saliency.csv'
+# eye_tracking_filepath = f'corpus_du_df.csv'
+# saliency_df = pd.read_csv(saliency_filepath)
+# saliency_df['trialid'] = saliency_df['trialid'].apply(lambda x: x + 1)
+# eye_tracking_df = pd.read_csv(eye_tracking_filepath)
+# df = pd.merge(eye_tracking_df, saliency_df[['trialid', 'ianum', 'saliency_mean', 'saliency_sum']], how='left', on=['trialid', 'ianum'])
+# df.to_csv('eye_tracking_saliency_du.csv')
+# # df = pd.read_csv('eye_tracking_saliency_du.csv')
+#
+# # run correlation
+# df_lm = df.dropna(subset=["dur", "saliency_mean", "frequency"])
+# model_sm_dur = smf.mixedlm("dur ~ saliency_mean + length + frequency", df_lm, groups=df_lm["uniform_id"]).fit()
+# print(model_sm_dur.summary())
+# df_glm = df.dropna(subset=["skip", "saliency_mean", "frequency"])
+# model_sm_skip = sm.BinomialBayesMixedGLM.from_formula('skip ~ saliency_mean + length + frequency', {'uniform_id': '0 + C(uniform_id)'}, df_glm).fit_vb()
+# print(model_sm_skip.summary())
 
-    # Filter to remove the first 3 texts because they presented different words with the same Id (ianum)
-    filt = (meco_df['trialid'] > 3)
-    eight_merged_df = meco_df.loc[filt] # .loc is something specific for reading dataframe, check the tutorials
-
-    # Filter to keep only the words that were indeed read
-    read_filter = (eight_merged_df['blink'] == 0.0) & (eight_merged_df['skip'] == 0.0)
-    read_eight_merged_df = eight_merged_df.loc[read_filter] # .loc is something specific for reading dataframe, check the tutorials
-
-    # FINAL DATA WOULD HAVE 36494 ROWS
-
-    # Regression out rates
-    mean_read_eight_merged_df = read_eight_merged_df.groupby(['trialid', 'ianum', 'ia'])['reg.out'].mean()
-
-    # mean_read_eight_merged_df.to_csv("/Users/anm/code/RegressionMECO/data/MECO/sup_reg_df.csv", sep='\t')
-    return mean_read_eight_merged_df.reset_index()
+# # correlation reg.in and saliency
+# reg_in_df = pd.read_csv('../data/MECO/regression_importance.csv')
+# reg_in_df['length'] = [len(ia) for ia in reg_in_df['previous.ia']] # add length as co-variate
+# reg_in_df = reg_in_df.rename(columns={"reg.in":"reg_in"})
+# # create a unique id for each word that triggered a regression
+# ids = []
+# counter = 1
+# for id, group in reg_in_df.groupby(['uniform_id','trialid','ianum']):
+#     ids.extend([counter for item in range(len(group))])
+#     counter += 1
+# assert len(ids) == len(reg_in_df['saliency'].tolist())
+# reg_in_df['iaid'] = ids
+# df_glm = reg_in_df.dropna(subset=["reg_in", "saliency"])
+# model_sm_skip = sm.BinomialBayesMixedGLM.from_formula('reg_in ~ saliency + length', {'uniform_id:iaid': '0 + C(iaid)'}, df_glm).fit_vb()
+# print(model_sm_skip.summary())
