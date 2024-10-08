@@ -20,7 +20,7 @@ The folder "src" contains all the scripts needed to re-run the experiments and t
 - **stats_analysis.R**: R script with all the statistical analysis reported in the paper.
 - **visualise_results.ipynb**: generates the graphs seen in the paper.
 
-## 2. How to run the experiments
+## 2. How to re-run experiments
 
 In order to re-run the experiments, you first need to create a folder called "data" in the root directory of the project (same level as the folder "src") and add the MECO corpus files "join_fix_trimmed.rda", which contains the fixation report, "supp texts.csv", which contains the trial passages, and "wordlist_meco.csv", which contains the frequency values per word in the corpus. These files are available in the folder "release 1.0/version 1.2" in the OSF repository (https://osf.io/3527a/) linked to the MECO paper (Siegelman et al, 2022).
 
