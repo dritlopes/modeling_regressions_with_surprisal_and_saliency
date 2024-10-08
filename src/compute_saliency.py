@@ -10,9 +10,6 @@ import string
 
 def compute_sensitivity(model, embedding_matrix, tokenizer, words, word_ids):
 
-    # # vocab_size = embedding_matrix.get_shape()[0]
-    # vocab_size = embedding_matrix.num_embeddings
-    # vocab_size = embedding_matrix.input_dim
     vocab_size = embedding_matrix.vocab_size
     sensitivity_data = []
 
@@ -108,7 +105,6 @@ def compute_sensitivity(model, embedding_matrix, tokenizer, words, word_ids):
 
     return sensitivity_data
 
-# We calculate relative saliency by summing the sensitivity a token has with all other tokens
 def extract_relative_saliency(model, embeddings, tokenizer, words, word_ids):
 
     sensitivity_data = compute_sensitivity(model, embeddings, tokenizer, words, word_ids)
@@ -117,7 +113,7 @@ def extract_relative_saliency(model, embeddings, tokenizer, words, word_ids):
     tokens = [entry["word"] for entry in sensitivity_data]
     token_ids = [entry["word_id"] for entry in sensitivity_data]
 
-    # For each token, I sum the sensitivity values it has with all other tokens
+    # For each token, I sum/average the sensitivity values it has with all other tokens
     distributed_sensitivity_updated = []
     for item, dist_s in enumerate(distributed_sensitivity):
         dist = [s for s in dist_s]
@@ -156,87 +152,21 @@ def extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, o
     df.to_csv(outfile)
     return df
 
-def create_saliency_dataframe(fixation_df, importance_df):
+def calculate_saliency_values(words_df, model_name):
 
-    importance_df.rename(columns={'text_id': 'trialid', 'token_id': 'ianum', 'token': 'ia'}, inplace=True)
+    texts = words_df.texts.unique()
+    words, word_ids = [], []
 
-    fixation_df = fixation_df[(fixation_df['reg.out']) == 1.0]
+    for text, group in words_df.groupby('trialid'):
+        words.append(group['ia'].tolist())
+        word_ids.append(group['ianum'].tolist())
 
-    fixation_importance = {'uniform_id': [],
-                           'trialid': [],
-                           'ianum': [],
-                           'ia': [],
-                           'previous.ia': [],
-                           'previous.ianum': [],
-                           'reg.in': [],
-                           'saliency': []}
+    if 'gpt2' in model_name:
+        model = TFGPT2LMHeadModel.from_pretrained(model_name, output_attentions=True)
+        tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+        embeddings = model.get_input_embeddings()
+        outfile_path = f'{model_name}_saliency.csv'
+        print(f'Extract saliency with {model_name}')
+        df = extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, outfile_path)
 
-    for id, group in fixation_df.groupby(['uniform_id', 'trialid']):
-
-        importance_df_trialid = importance_df[(importance_df['trialid'] == id[1]-1)]
-
-        for fixated_word, fixated_word_id, reg_out_to in zip(group['ia'].tolist(), group['ianum'].tolist(), group['reg.out.to'].tolist()):
-
-            fixated_word_df = importance_df_trialid[(importance_df_trialid['ianum'] == fixated_word_id)]
-            saliency_array = fixated_word_df['distributed_saliency'].tolist()[0]
-
-            if type(saliency_array) == str:
-                saliency_array = saliency_array.replace('[','').replace(']','')
-                saliency_array = saliency_array.split(',')
-                saliency_array = [float(s) for s in saliency_array[:-1]]
-
-            fixation_importance['saliency'].extend(saliency_array)
-            fixation_importance['previous.ianum'].extend(importance_df_trialid['ianum'].tolist()[:len(saliency_array)])
-            fixation_importance['previous.ia'].extend(importance_df_trialid['ia'].tolist()[:len(saliency_array)])
-            fixation_importance['ianum'].extend([fixated_word_id for i in range(len(saliency_array))])
-            fixation_importance['ia'].extend([fixated_word for i in range(len(saliency_array))])
-            fixation_importance['trialid'].extend([id[1] for i in range(len(saliency_array))])
-            fixation_importance['uniform_id'].extend([id[0] for i in range(len(saliency_array))])
-
-            reg_in = []
-            for previous_id in importance_df_trialid['ianum'].tolist()[:len(saliency_array)]:
-                if previous_id == reg_out_to:
-                    reg_in.append(1)
-                else:
-                    reg_in.append(0)
-            fixation_importance['reg.in'].extend(reg_in)
-
-    fixation_importance_df = pd.DataFrame.from_dict(fixation_importance)
-    fixation_importance_df.to_csv('../data/MECO/regression_importance.csv')
-    fixation_importance_df_ranked = fixation_importance_df.sort_values(by=['uniform_id','trialid','ianum','saliency'])
-    fixation_importance_df_ranked.to_csv('../data/MECO/regression_importance_ranked.csv')
-
-def main():
-
-    models = ['gpt2']
-    corpora = ['MECO']
-    measures = ['saliency']
-
-    for corpus in corpora:
-
-        # corpus_df = pd.read_csv(f'../data/MECO/words_en_df.csv')
-        corpus_df = pd.read_csv(f'../data/MECO/words_en_df.csv', index_col=0)
-        fixation_df = pd.read_csv('../data/MECO/fixation_en_df.csv')
-
-        texts = corpus_df.texts.unique()
-        words, word_ids = [], []
-        for text, group in corpus_df.groupby('trialid'):
-            words.append(group['ia'].tolist())
-            word_ids.append(group['ianum'].tolist())
-
-        for modelname in models:
-
-            if modelname == 'gpt2':
-                model = TFGPT2LMHeadModel.from_pretrained(modelname, output_attentions=True)
-                tokenizer = GPT2Tokenizer.from_pretrained(modelname)
-                embeddings = model.get_input_embeddings()
-
-                for measure in measures:
-                    outfile_path = f'{modelname}_{measure}.csv'
-                    print(f'Extract saliency for {corpus} with {modelname}')
-                    saliency_df = extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, outfile_path)
-                    create_saliency_dataframe(fixation_df, saliency_df)
-
-if __name__ == '__main__':
-    main()
-
+        return df
