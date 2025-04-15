@@ -1,16 +1,30 @@
 import numpy as np
 import tensorflow as tf
-import scipy.special
 from transformers import TFGPT2LMHeadModel, GPT2Tokenizer
 import pandas as pd
-import string
+import keras
 
 # ------------- Code based on code from Hollenstein & Beinborn (2021) -------------
 # source: https://github.com/beinborn/relative_importance/blob/main/extract_model_importance/extract_saliency.py
 
-def compute_sensitivity(model, embedding_matrix, tokenizer, words, word_ids):
+def compute_sensitivity(model: TFGPT2LMHeadModel,
+                        embedding_matrix:keras.src.layers.core.embedding.Embedding,
+                        tokenizer: GPT2Tokenizer,
+                        words: list[str],
+                        word_ids:list[int]) -> list[dict]:
 
-    vocab_size = embedding_matrix.vocab_size
+    """
+    Compute sensitivity score of each previous word in relation to each upcoming word.
+    :param model: language model
+    :param embedding_matrix: embedding layer of langauge model
+    :param tokenizer: tokenizer of language model
+    :param words: list of words
+    :param word_ids: list of word ids
+    :return: list with saliency data (word, word_id, and distributed saliency - each entry is the saliency score of the previous word in relation to the current target word)
+    """
+
+    vocab_size = embedding_matrix.input_dim
+    # vocab_size = embedding_matrix.vocab_size
     sensitivity_data = []
 
     for word_index in range(len(words)):
@@ -105,7 +119,21 @@ def compute_sensitivity(model, embedding_matrix, tokenizer, words, word_ids):
 
     return sensitivity_data
 
-def extract_relative_saliency(model, embeddings, tokenizer, words, word_ids):
+def extract_relative_saliency(model:TFGPT2LMHeadModel,
+                              embeddings:keras.src.layers.core.embedding.Embedding,
+                              tokenizer:GPT2Tokenizer,
+                              words:list[str],
+                              word_ids:list[int]):
+
+    """
+    Compute saliency values for each word in the text.
+    :param model: language model
+    :param embeddings: embedding layer of language model
+    :param tokenizer: tokenizer of langauge model
+    :param words: list of words to compute saliency for
+    :param word_ids: list of word ids to compute saliency for
+    :return: the resulting tokens, token ids, summed saliency, averaged saliency, and distributed saliency values (each previous word relative to current word)
+    """
 
     sensitivity_data = compute_sensitivity(model, embeddings, tokenizer, words, word_ids)
 
@@ -113,7 +141,7 @@ def extract_relative_saliency(model, embeddings, tokenizer, words, word_ids):
     tokens = [entry["word"] for entry in sensitivity_data]
     token_ids = [entry["word_id"] for entry in sensitivity_data]
 
-    # For each token, I sum/average the sensitivity values it has with all other tokens
+    # For each token, sum/average the sensitivity values it has with all other tokens
     distributed_sensitivity_updated = []
     for item, dist_s in enumerate(distributed_sensitivity):
         dist = [s for s in dist_s]
@@ -123,36 +151,53 @@ def extract_relative_saliency(model, embeddings, tokenizer, words, word_ids):
     saliency_sum = np.sum(distributed_sensitivity_updated, axis=0)
     saliency_mean = np.mean(distributed_sensitivity_updated, axis=0)
 
-    # Taking the softmax does not make a difference for calculating correlation
-    # It can be useful to scale the salience signal to the same range as the human attention
-    # saliency = scipy.special.softmax(saliency)
-
     return tokens, token_ids, saliency_sum[:len(tokens)], saliency_mean[:len(tokens)], distributed_sensitivity
 
-def extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, outfile):
+def extract_all_saliency(model: TFGPT2LMHeadModel,
+                         embeddings:keras.src.layers.core.embedding.Embedding,
+                         tokenizer:GPT2Tokenizer, texts:list[str],
+                         words:list[list[str]],
+                         word_ids:list[list[int]])->pd.DataFrame:
+
+    """
+    Compute saliency values for each word in each text.
+    :param model: language model
+    :param embeddings: embedding layer of language model
+    :param tokenizer: tokenizer of language model
+    :param texts: texts to compute saliency
+    :param words: words to compute saliency
+    :param word_ids: word ids to compute saliency
+    :return: dataframe with saliency values
+    """
 
     all_text_ids, all_token_ids, all_tokens, all_saliency_sum, all_saliency_mean, all_dist_saliency = [], [], [], [], [], []
 
     for i, text in enumerate(texts):
-
+        # for each text, compute gradient saliency of each previous words relative to each word
         tokens, token_ids, saliency_sum, saliency_mean, dist_saliency = extract_relative_saliency(model, embeddings, tokenizer, words[i], word_ids[i])
-        all_text_ids.extend([i for token in tokens])
+        all_text_ids.extend([i + 1 for token in tokens])
         all_tokens.extend(tokens)
         all_token_ids.extend(token_ids)
         all_saliency_sum.extend(saliency_sum)
         all_saliency_mean.extend(saliency_mean)
         all_dist_saliency.extend(dist_saliency)
 
-    df = pd.DataFrame({'text_id': all_text_ids,
-                       'token_id': all_token_ids,
-                       'token': all_tokens,
+    df = pd.DataFrame({'trialid': all_text_ids,
+                       'ianum': all_token_ids,
+                       'ia': all_tokens,
                        'distributed_saliency': all_dist_saliency,
                        'saliency_sum': all_saliency_sum,
                        'saliency_mean': all_saliency_mean})
-    df.to_csv(outfile)
     return df
 
-def calculate_saliency_values(words_df, model_name):
+def calculate_saliency_values(words_df:pd.DataFrame, model_name:str) -> pd.DataFrame:
+
+    """
+    Compute gradient saliency values for a given dataset.
+    :param words_df: dataset with text words for which we want to compute saliency.
+    :param model_name: name of language model with which to compute saliency.
+    :return: words dataframe with gradient saliency values.
+    """
 
     texts = words_df.texts.unique()
     words, word_ids = [], []
@@ -162,11 +207,10 @@ def calculate_saliency_values(words_df, model_name):
         word_ids.append(group['ianum'].tolist())
 
     if 'gpt2' in model_name:
-        model = TFGPT2LMHeadModel.from_pretrained(model_name, output_attentions=True)
+        model = TFGPT2LMHeadModel.from_pretrained(model_name, output_attentions=True, return_dict_in_generate=True)
         tokenizer = GPT2Tokenizer.from_pretrained(model_name)
         embeddings = model.get_input_embeddings()
-        outfile_path = f'{model_name}_saliency.csv'
         print(f'Extract saliency with {model_name}')
-        df = extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids, outfile_path)
+        df = extract_all_saliency(model, embeddings, tokenizer, texts, words, word_ids)
 
         return df

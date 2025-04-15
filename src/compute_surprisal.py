@@ -5,13 +5,23 @@ import string
 import pandas as pd
 
 # Calculate the surprisal value for each word from original texts (df)
-def calculate_surprisal_values(df: pd.DataFrame, corpus_name, model_name):
+def calculate_surprisal_values(df: pd.DataFrame, corpus_name:str, model_name:str)->pd.DataFrame:
+
+    """
+    Compute surprisal values for each word in dataset.
+    :param df: words dataset
+    :param corpus_name: name of eye-tracking corpus
+    :param model_name: name of langauge model with which to compute surprisal
+    :return: word dataframe with surprisal values
+    """
 
     #see https://huggingface.co/docs/transformers/model_doc/gpt2 for gpt2 documentation
 
     if 'gpt2' in model_name:
         model = GPT2LMHeadModel.from_pretrained(model_name)
         tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+    else:
+        raise Exception('Model name must be gpt2 or gpt2-large.')
 
     # Process text with language model
     # previous_context = ""  # cumulator, to start a for loop you need an empty variable to include something in each loop
@@ -62,10 +72,9 @@ def calculate_surprisal_values(df: pd.DataFrame, corpus_name, model_name):
                                          next_word_id])
 
     df['surprisal'] = surprisal_values
-    df.to_csv(f"../data/MECO/surprisal_{model_name}_df.csv", sep='\t')
 
     # write out which words in the corpus are multi-tokens in the model
-    with open(f'../data/{corpus_name}/multi_tokens_{model_name}.csv', 'w') as outfile:
+    with open(f'../data/{corpus_name}/processed/multi_tokens_{model_name}.csv', 'w') as outfile:
         outfile.write(f'CORPUS_TOKEN\tMODEL_TOKEN\n')
         for model_token, corpus_token in zip(model_tokens, corpus_tokens):
             outfile.write(f'{corpus_token}\t{model_token}\n')
