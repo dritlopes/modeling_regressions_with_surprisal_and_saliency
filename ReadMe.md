@@ -2,7 +2,7 @@
 
 This repository contains the code for the following paper: 
 
-Adrielli Tina Lopes Rego, Alline Nogueira, Joshua Snell and Martijn Meeter (2024). _A Prediction-based Approach to Regressions in Reading_. [Manuscript in preparation] 
+Adrielli Tina Lopes Rego, Alline Nogueira, Joshua Snell and Martijn Meeter (2025). _A Prediction-based Approach to Regressions in Reading_. [Manuscript in preparation] 
 
 **Abstract**
 
@@ -18,7 +18,6 @@ The folder "src" contains all the scripts needed to re-run the experiments and t
 - **compute_saliency.py**: takes the file with each word as row and computes the saliency for each word relative to each other text word.
 - **post_process_regression.py**: takes the generated saliency values and the pre-processed fixation report and generates the dataset for the regression landing analysis.
 - **stats_analysis.R**: R script with all the statistical analysis reported in the paper.
-- **visualise_results.ipynb**: generates the graphs seen in the paper.
 
 ## 2. How to re-run experiments
 

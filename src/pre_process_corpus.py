@@ -23,6 +23,8 @@ class WordData:
 
         data =  pd.read_csv(self.filepath)
 
+        data.drop(['Unnamed: 13', 'Unnamed: 14'], axis=1, inplace=True)
+        data.columns = ['lang', 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
         # only English texts
         lan_filter = (data['lang'] == 'English')
         lan_texts_df = data.loc[lan_filter]
