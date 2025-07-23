@@ -38,13 +38,13 @@ class WordData:
         # do some cleaning on each text
         trialid_cleaning_df = trialid_raw_df.copy()
         # replace with "space" the "\\n" at the beginning of a word
-        trialid_cleaning_df["text"] = trialid_cleaning_df["text"].str.replace(" \\n", " ")
+        trialid_cleaning_df["text"] = trialid_cleaning_df["text"].str.replace(" \\n", " ", regex=False)
         # replace with "space" the "\\n" between words as "word\\nword"
-        trialid_cleaning_df["text"] = trialid_cleaning_df["text"].str.replace("\\n", " ")
+        trialid_cleaning_df["text"] = trialid_cleaning_df["text"].str.replace("\\n", " ", regex=False)
         # when "word-word" add a space after first word, then the words would be separated equally
-        trialid_cleaning_df["text"] = trialid_cleaning_df["text"].str.replace("-", "- ")
+        trialid_cleaning_df["text"] = trialid_cleaning_df["text"].str.replace("-", "- ", regex=False)
         # replace with a empty string all the quotation marks
-        trialid_cleaning_df["text"] = trialid_cleaning_df["text"].str.replace('"', '')
+        trialid_cleaning_df["text"] = trialid_cleaning_df["text"].str.replace('"', '', regex=False)
 
         # create dataframe with each row being a word
         trialid, text, ia_new, ianum_new = [], [], [], []
@@ -192,6 +192,10 @@ class FixationData:
         data['reg.in.from'] = in_regs_ias
         data['reg.out'] = out_regs
         data['reg.out.to'] = out_reg_ias
+
+        # remove first fixation of a trial which also triggers a regression (likely noise)
+        # print(len(data[(data['fixid'] == 1) & (data['reg.out'] == 1)])/len(data[data['reg.out']==1]))
+        data = data.drop(data[(data['fixid'] == 1) & (data['reg.out'] == 1)].index)
 
         return data
 
@@ -361,8 +365,8 @@ class FixationData:
         # add median split of duration of each participant
         median_split = []
         for i, participant_fixations in df.groupby('participant_id'):
-            median_split.extend(['long' if dur > median(participant_fixations['dur']) else 'short' for dur in
-                                 participant_fixations['dur'].tolist()])
+            median_split.extend(['long' if dur > median(participant_fixations['dur'].astype('int64').tolist()) else 'short' for dur in
+                                 participant_fixations['dur'].astype('int64').tolist()])
         df['dur.bin'] = median_split
 
         # compute regression info and outgoing saccade distance in words
@@ -416,6 +420,8 @@ class FixationData:
                                                   'ia.reg.in.from': 'reg.in.from',
                                                   'uniform_id': 'participant_id'})
 
+
+
         # Remove quotation marks, as done for words_df
         fixation_df["ia"] = fixation_df["ia"].apply(lambda x: str(x).replace('"', ''))
 
@@ -432,15 +438,19 @@ class FixationData:
             f'../data/MECO/processed/fixation_outliers.csv', index=False)
 
         # Remove first fixation of a trial which also triggers a regression (likely noise)
+        # print(len(fixation_df[(fixation_df['fixid'] == 1) & (fixation_df['reg.out'] == 1)])/len(fixation_df[fixation_df['reg.out']==1]))
         fixation_df = fixation_df.drop(fixation_df[(fixation_df['fixid'] == 1) & (fixation_df['reg.out'] == 1)].index)
-        # Only keep columns we are going to use for the analysis
-        fixation_df = fixation_df.drop(['xs'], axis=1)
 
         # Remove regression that is subsequently followed by another regression (likely noise)
         # fixation_df = self._remove_subsequent_regressions(fixation_df)
 
         # Deal with noise in regressions to upper lines
+        # print(len(fixation_df[fixation_df['reg.out']==1]))
         fixation_df = self._remove_close_reg_upper_line(fixation_df)
+        # print(len(fixation_df[fixation_df['reg.out'] == 1]))
+
+        # Only keep columns we are going to use for the analysis
+        fixation_df = fixation_df.drop(['xs'], axis=1)
 
         # Add median split of duration of each participant
         median_split = []
@@ -468,6 +478,8 @@ class FixationData:
         fixation_df['sac.in.dist'] = in_dist
         fixation_df['sac.out.dist'] = out_dist
 
+        fixation_df.reset_index(inplace=True)
+
         return fixation_df
 
     def pre_process_fixation_data(self):
@@ -479,11 +491,12 @@ class FixationData:
         else:
             raise Exception(f'Corpus {self.corpus} not supported.')
         self.data = data
+        return self.data
 
     def add_variables(self, variables:list[str], frequency_filepath:str='') -> pd.DataFrame:
 
         """
-        Add variables to the fixation dataframe.
+        Add variables to the fixation dataframe
         :param variables: list of names of variables to be added to dataframe
         :param frequency_filepath: filepath where word frequencies are located (SUBTLEX or MECO's frequency list)
         :return: dataframe with added variables
@@ -506,8 +519,7 @@ class FixationData:
             elif self.corpus == 'Provo':  # we use SUBTLEX-UK
                 freq_col_name = 'LogFreq(Zipf)'
                 word_col_name = 'Spelling'
-                frequency_df = pd.read_csv(frequency_filepath, sep='\t', usecols=[freq_col_name, word_col_name],
-                                           dtype={word_col_name: np.dtype(str)})
+                frequency_df = pd.read_csv(frequency_filepath, sep='\t', usecols=[freq_col_name, word_col_name], dtype={word_col_name: np.dtype(str)})
             else:
                 raise NotImplementedError('Frequency resource or corpus not implemented.')
 
@@ -634,10 +646,10 @@ def check_alignment(words_df: pd.DataFrame, eye_df: pd.DataFrame):
         for ia, ianum in zip(group['ia'].tolist(), group['ianum'].tolist()):
             words_df_dict[trialid][ianum] = ia
 
-    # for each word if and word in eye-movement dataframe, check if it's the same in word dataframe
+    # for each word id and word in eye-movement dataframe, check if it's the same in word dataframe
     for id, data in eye_df.groupby(['participant_id', 'trialid']):
         for eye_ia, eye_ianum in zip(data['ia'].tolist(), data['ianum'].tolist()):
-            # in case word_id-word combination from eye-movement dataframe does not exist in words dataframe
+            # in case word id from eye-movement dataframe does not exist in words dataframe
             assert eye_ianum in words_df_dict[id[1]].keys(), print(
                 f'Word id {eye_ianum} of text {id[1]} and participant '
                 f'{id[0]} in eye-tracking data not in words dataframe;'
@@ -665,7 +677,8 @@ def pre_process_corpus(texts_filepath:str, words_filepath:str, corpus_filepath:s
     # Word data
     word_data = WordData(corpus=corpus,
                          filepath=texts_filepath).create_texts_df()
-    word_data.data.to_csv(words_filepath, index=False)
+    word_data.to_csv(words_filepath, index=False)
+    # word_data = pd.read_csv(words_filepath)
 
     # Fixation data
     fixation_obj = FixationData(corpus=corpus,
@@ -674,7 +687,8 @@ def pre_process_corpus(texts_filepath:str, words_filepath:str, corpus_filepath:s
     if corpus == 'Provo':
         data = add_sent_ids_to_provo(eye_data, word_data)
         fixation_obj.data = data
-    eye_data = fixation_obj.add_variables(['length', 'frequency', 'word-1'], frequency_filepath)
+    eye_data = fixation_obj.add_variables(variables=['length', 'frequency', 'word-1'],
+                                          frequency_filepath=frequency_filepath)
     eye_data.to_csv(eye_filepath, index=False)
 
     # Check alignment between words and fixation dataframe

@@ -105,7 +105,10 @@ def compute_sensitivity(model: TFGPT2LMHeadModel,
             if i in all_indices:
                 for occurrence in sensitivity_merge_updated:
                     if i == occurrence[0]:
+                        # average sensitivity values
                         sensitivity_updated.append(np.mean(sensitivity[occurrence[0]:occurrence[-1]+1]))
+                        # or sum
+                        # sensitivity_updated.append(np.sum(sensitivity[occurrence[0]:occurrence[-1] + 1]))
             else:
                 sensitivity_updated.append(sensitivity[i])
         # print(sensitivity_updated)

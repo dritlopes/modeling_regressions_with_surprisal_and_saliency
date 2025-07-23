@@ -26,7 +26,7 @@ setwd(glue("/Users/adriellilopes/PycharmProjects/modeling_regressions_with_surpr
 # 1. OUTGOING REGRESSION ANALYSIS (When do we regress?)
 
 model <-'gpt2'
-df<-read.csv(glue("processed/surprisal_{model}_fixation.csv"),header=T)
+df<-read.csv(glue("processed/surprisal_{model}_fixation_1.csv"),header=T)
 head(df)
 dim(df)
 
@@ -129,7 +129,7 @@ legend('bottomleft',
 
 # 2. INCOMING REGRESSION ANALYSIS (Where do we regress to?)
 
-model <-'gpt2-large'
+model <-'gpt2'
 df<-read.csv(glue("processed/saliency_{model}_fixation.csv"),header=T)
 head(df)
 dim(df)
