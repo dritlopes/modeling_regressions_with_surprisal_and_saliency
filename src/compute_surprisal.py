@@ -73,7 +73,7 @@ def calculate_surprisal_values(df: pd.DataFrame, corpus_name:str, model_name:str
     df['surprisal'] = surprisal_values
 
     # write out which words in the corpus are multi-tokens in the model
-    with open(f'../data/{corpus_name}/processed/multi_tokens_{model_name}_1.csv', 'w') as outfile:
+    with open(f'../data/{corpus_name}/processed/multi_tokens_{model_name}.csv', 'w') as outfile:
         outfile.write(f'CORPUS_TOKEN\tMODEL_TOKEN\n')
         for model_token, corpus_token in zip(model_tokens, corpus_tokens):
             outfile.write(f'{corpus_token}\t{model_token}\n')

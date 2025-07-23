@@ -9,9 +9,9 @@ corpus = 'MECO' # 'MECO' # Provo
 # language model name
 model = "gpt2" # gpt2-large
 # fixation report with extra variables for analysis
-eye_filepath =  f'../data/{corpus}/processed/fixation_en_df_1.csv'
+eye_filepath =  f'../data/{corpus}/processed/fixation_en_df.csv'
 # each row is a text word
-words_filepath = f'../data/{corpus}/processed/words_en_df_1.csv'
+words_filepath = f'../data/{corpus}/processed/words_en_df.csv'
 
 if corpus == 'MECO':
     # each row is a trial text
@@ -44,12 +44,12 @@ fixation_df, words_df = pre_process_corpus(texts_filepath=texts_filepath,
 
 print(f'-------Language Model: {model}-------')
 print('Extracting surprisal values per text word...')
-surprisal_filepath = f"../data/{corpus}/processed/surprisal_{model}_1.csv"
+surprisal_filepath = f"../data/{corpus}/processed/surprisal_{model}.csv"
 surprisal_df = calculate_surprisal_values(words_df, corpus, model)
 surprisal_df.to_csv(surprisal_filepath, index=False)
 
 print('Creating data frame for analysis of outgoing regressions...')
-surprisal_eye_filepath = f'../data/{corpus}/processed/surprisal_{model}_fixation_1.csv'
+surprisal_eye_filepath = f'../data/{corpus}/processed/surprisal_{model}_fixation.csv'
 surprisal_fixation_df = create_outgoing_regression_df(surprisal_df, fixation_df)
 surprisal_fixation_df.to_csv(surprisal_eye_filepath, index=False)
 
