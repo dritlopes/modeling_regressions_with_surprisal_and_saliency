@@ -40,27 +40,28 @@ def calculate_surprisal_values(df: pd.DataFrame, corpus_name:str, model_name:str
 
             else:
                 next_word = ' ' + next_word
-                next_word = next_word.strip(string.punctuation)
+                # next_word = next_word.strip(string.punctuation)
                 # tokenize next word
                 next_word_id = tokenizer(next_word, return_tensors='pt')["input_ids"][0]
 
                 # to deal with multi-token words
                 total_word_surprisal = 0.0
-                for token_id in next_word_id:
-                    # tokenize previous context
-                    encoded_input = tokenizer(previous_context, return_tensors='pt')
-                    # turn off dropout layers
-                    model.eval()
-                    output = model(**encoded_input)
-                    # logits are scores from output layer of shape (batch_size, sequence_length, vocab_size)
-                    logits = output.logits[:, -1, :]
-                    # convert raw scores into probabilities (between 0 and 1)
-                    probabilities = nn.functional.softmax(logits,
-                                                          dim=1)  # softmax transforms the values from logits into percentages
-                    next_token_prob = probabilities[0, token_id]
-                    next_token_prob = next_token_prob.cpu().detach().numpy()
-                    surprisal = -np.log2(next_token_prob)
-                    total_word_surprisal += surprisal
+                for i, token_id in enumerate(next_word_id):
+                    if tokenizer.decode([token_id]) not in string.punctuation:
+                        # tokenize previous context
+                        encoded_input = tokenizer(previous_context, return_tensors='pt')
+                        # turn off dropout layers
+                        model.eval()
+                        output = model(**encoded_input)
+                        # logits are scores from output layer of shape (batch_size, sequence_length, vocab_size)
+                        logits = output.logits[:, -1, :]
+                        # convert raw scores into probabilities (between 0 and 1)
+                        probabilities = nn.functional.softmax(logits,
+                                                                    dim=1)  # softmax transforms the values from logits into percentages
+                        next_token_prob = probabilities[0, token_id]
+                        next_token_prob = next_token_prob.cpu().detach().numpy()
+                        surprisal = -np.log2(next_token_prob)
+                        total_word_surprisal += surprisal
                     previous_context += tokenizer.decode([token_id])
                 surprisal_values.append(total_word_surprisal)
 

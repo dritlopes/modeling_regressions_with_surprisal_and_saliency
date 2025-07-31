@@ -19,7 +19,7 @@ library(itsadug)
 library(tidyr)
 
 # 0.2 - Set working directory to where the data file is located & results should be saved
-corpus <-'MECO' # switch between corpora to get models for each
+corpus <-'Provo' # switch between corpora to get models for each
 setwd(glue("/Users/adriellilopes/PycharmProjects/modeling_regressions_with_surprisal_and_saliency/data/{corpus}/"))
 
 
