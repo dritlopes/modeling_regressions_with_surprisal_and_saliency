@@ -1,8 +1,6 @@
 # Analysing Regressions in Reading with Surprisal and Saliency
 
-This repository contains the code for the following paper: 
-
-Adrielli Tina Lopes Rego, Alline Nogueira, Joshua Snell and Martijn Meeter (2025). _A Prediction-based Approach to Regressions in Reading_. [Manuscript in preparation] 
+This repository contains the code for a paper in prep.
 
 **Abstract**
 
