@@ -1,11 +1,12 @@
 # Analysing Regressions in Reading with Surprisal and Saliency
 
-This repository contains the code for a paper "What Drives Regressions in Reading? Insights from Surprisal and Saliency from
-Language Models" (under review).
+This repository contains the code for the following paper:
+
+Rego, A. T. L., Melo, A. N., Snell, J., & Meeter, M. (2026). What drives regressions in reading? Insights from surprisal and saliency from language models. Cognition, 273, 106535.
 
 **Abstract**
 
-"During reading, what makes us regress – i.e., go back in a text instead of going forward? One prevailing view is that regressions reflect comprehension processes, that is, readers selectively regress to retrieve relevant information from text. Here we investigate whether surprisal and saliency derived from large language models can predict the initiation and destination of regressions. Surprisal is a measure of how (un)expected a word is given its context and may be interpreted to reflect the difficulty of integrating the fixated word into the mental representation built from the previously read context. Saliency is a measure of how relevant a word is to the correct prediction of an upcoming word (in this case, the regression origin). Across two English corpora of eye movements and two monolingual large language models, we found that less surprising words were more likely to trigger a regression, while more salient and more surprising words were more likely to be the target of a regression. Our results suggest that readers tend to regress when cognitive load is lower to reactivate linguistic input associated with the regression origin, in favour of the reactivation hypothesis of regressions in reading."
+"During reading, what makes us regress – i.e., go back in a text instead of going forward? One prevailing view is that regressions reflect comprehension processes, that is, readers selectively regress to retrieve relevant information from text. Here we investigate whether surprisal and saliency derived from large language models can predict the initiation and destination of regressions. Surprisal is a measure of how (un)expected a word is given its context and may be interpreted to reflect the difficulty of integrating the fixated word into the mental representation built from the previously read context. Saliency is a measure of how relevant a word is to the correct prediction of an upcoming word (in this case, the regression origin). Across two English corpora of eye movements and two monolingual large language models, we found that less surprising words were more likely to trigger a regression, while more salient and more surprising words were more likely to be the target of a regression. Our results suggest that readers tend to regress when cognitive load is lower to reactivate linguistic input associated with the regression origin, in favor of the reactivation hypothesis of regressions in reading."
 
 ## 1. Folder structure
 
